@@ -47,7 +47,7 @@ model Blog {
 
 model Testimonial {
   id        String   @id @default(uuid())
-  image     String
+  image     String?
   name      String
   role      String
   message   String

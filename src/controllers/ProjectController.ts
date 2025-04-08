@@ -1,6 +1,14 @@
 import { Request, Response } from "express";
-import upload from "../Middleware/upload";
 import { PrismaClient } from "@prisma/client";
+import upload from "../Middleware/upload";
+import { v2 as cloudinary } from 'cloudinary';
+
+import dotenv from "dotenv";
+dotenv.config();
+
+cloudinary.config({
+    cloud_url: process.env.CLOUDINARY_URL,
+  });
 
 const prisma = new PrismaClient();
 
@@ -12,36 +20,43 @@ interface UserRequest extends Request {
 
 class ProjectController {
     static async createProject(req: UserRequest, res: Response): Promise<void> {
-        // Handle image uploads first
-        upload.array("images", 10)(req, res, async (err: any) => {
-            if (err) {
-                return res.status(400).json({ message: "Error uploading files", error: err.message });
-            }
-
-            // Extract the fields from req.body after the upload
-            const { title, description, category } = req.body;
-
-            // Collect file paths (relative to the uploads folder)
-            const imagePaths = (req.files as Express.Multer.File[]).map(file => file.path);
-
-            try {
-                // Create the project in the database
-                const newProject = await prisma.project.create({
-                    data: {
-                        title,
-                        description,
-                        category,
-                        images: imagePaths,
-                    },
+        // Upload the images to Cloudinary
+        upload.array("images", 20)(req, res, async (err: any) => {
+          if (err) {
+            return res.status(400).json({ message: "Error uploading files", error: err.message });
+          }
+    
+          // Extract the fields from req.body after the upload
+          const { title, description, category } = req.body;
+    
+          // Upload images to Cloudinary and collect the URLs
+          try {
+            const imageUploads = await Promise.all(
+              (req.files as Express.Multer.File[]).map(async (file) => {
+                const result = await cloudinary.uploader.upload(file.path, {
+                  folder: "projects",
                 });
-
-                res.status(201).json(newProject);
-            } catch (error) {
-                console.error("Error creating project:", error);
-                res.status(500).json({ message: "Server error" });
-            }
+                return result.secure_url;
+              })
+            );
+    
+            // Create the project in the database with Cloudinary image URLs
+            const newProject = await prisma.project.create({
+              data: {
+                title,
+                description,
+                category,
+                images: imageUploads,
+              },
+            });
+    
+            res.status(201).json(newProject);
+          } catch (error) {
+            console.error("Error uploading images to Cloudinary:", error);
+            res.status(500).json({ message: "Server error" });
+          }
         });
-    }
+      }
 
     static async getProjectById(req: Request, res: Response): Promise<void> {
         const { id } = req.params;
@@ -59,7 +74,7 @@ class ProjectController {
     }
 
     static async getProjects(req: Request, res: Response): Promise<void> {
-        const { page = 1, pageSize = 10 } = req.query; // Default to page 1 and pageSize 10
+        const { page = 1, pageSize = 10 } = req.query;
     
         try {
             const totalProjects = await prisma.project.count();
@@ -146,7 +161,7 @@ class ProjectController {
                 where: { id },
             });
     
-            res.status(200).json(deletedProject);
+            res.status(200).json({ message: "Project deleted successfully", deletedProject });
         } catch (error) {
             console.error("Error deleting project:", error);
             res.status(500).json({ message: "Server error" });

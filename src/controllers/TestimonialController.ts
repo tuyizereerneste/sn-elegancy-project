@@ -12,45 +12,45 @@ cloudinary.config({
 
 const prisma = new PrismaClient();
 
-
 interface UserRequest extends Request {
     user?: {
         id: string;
+        name: string;
     };
 }
 
-class BlogController {
+class TestimonyController {
     // 1. Create a Blog
-    static async createBlog(req: UserRequest, res: Response): Promise<void> {
+    static async createTestimony(req: UserRequest, res: Response): Promise<void> {
         // Handle the image upload using Cloudinary for a single image
         upload.single("image")(req, res, async (err: any) => {
             if (err) {
                 return res.status(400).json({ message: "Error uploading file", error: err.message });
             }
     
-            const { author, sector, title, content } = req.body;
+            const { name, role, message, work } = req.body;
     
             try {
                 // Upload the single image to Cloudinary
                 const imageUpload = await cloudinary.uploader.upload((req.file as Express.Multer.File).path, {
-                    folder: "blogs", // Optional: specify the folder name in Cloudinary
+                    folder: "testimonials", // Optional: specify the folder name in Cloudinary
                 });
     
-                // Create the new blog with the uploaded image URL
-                const newBlog = await prisma.blog.create({
+                // Create the new testimony with the uploaded image URL
+                const newTestimony = await prisma.testimonial.create({
                     data: {
-                        author,
-                        sector,
-                        title,
-                        content,
+                        name,
+                        role,
+                        message,
+                        work,
                         image: imageUpload.secure_url, // Store the Cloudinary image URL
                     },
                 });
     
-                res.status(201).json({ message: "Blog created successfully", blog: newBlog });
-                console.log("Blog created successfully:");
+                res.status(201).json({ message: "Testimony created successfully", testimony: newTestimony });
+                console.log("Testimony created successfully:");
             } catch (error) {
-                console.error("Error creating blog:", error);
+                console.error("Error creating testimony:", error);
                 res.status(500).json({ message: "Server error" });
             }
         });
@@ -58,55 +58,54 @@ class BlogController {
     
 
     // 2. Get all Blogs
-    static async getAllBlogs(req: Request, res: Response): Promise<void> {
+    static async getAllTestimonies(req: Request, res: Response): Promise<void> {
         try {
             const page = parseInt(req.query.page as string) || 1;
             const limit = parseInt(req.query.limit as string) || 10;
             const skip = (page - 1) * limit;
     
-            const blogs = await prisma.blog.findMany({
+            const testimony = await prisma.testimonial.findMany({
                 orderBy: { createdAt: "desc" },
                 skip, 
                 take: limit,
             });
     
-            const totalBlogs = await prisma.blog.count();
+            const totalTestimony = await prisma.testimonial.count();
     
-            const totalPages = Math.ceil(totalBlogs / limit);
+            const totalPages = Math.ceil(totalTestimony / limit);
     
             res.status(200).json({
-                blogs,
+                testimony,
                 pagination: {
                     page,
                     limit,
-                    totalBlogs,
+                    totalTestimony,
                     totalPages,
                 },
             });
     
-            console.log("Fetched blogs successfully:", blogs);
+            console.log("Fetched Testmonials successfully:");
         } catch (error) {
-            console.error("Error fetching blogs:", error);
+            console.error("Error fetching testimonials:", error);
             res.status(500).json({ message: "Server error" });
         }
     }
     
 
-    // 3. Get a single Blog by ID
-    static async getBlogById(req: Request, res: Response): Promise<void> {
+    static async getTestimonyById(req: Request, res: Response): Promise<void> {
         const { id } = req.params;
 
         try {
-            const blog = await prisma.blog.findUnique({
+            const testimony = await prisma.testimonial.findUnique({
                 where: { id },
             });
 
-            if (!blog) {
-                res.status(404).json({ message: "Blog not found" });
+            if (!testimony) {
+                res.status(404).json({ message: "Testimony not found" });
                 return;
             }
 
-            res.status(200).json(blog);
+            res.status(200).json({ message: "Testimony Fetched successfully:", testimony });
         } catch (error) {
             console.error("Error fetching blog:", error);
             res.status(500).json({ message: "Server error" });
@@ -114,20 +113,17 @@ class BlogController {
     }
 
     // 4. Update a Blog by ID
-    static async updateBlog(req: Request, res: Response): Promise<void> {
+    static async updateTestimony(req: Request, res: Response): Promise<void> {
         const { id } = req.params;
         const { author, sector, title, content, image } = req.body;
 
         try {
-            const existingBlog = await prisma.blog.findFirst({
-                where: {
-                    title,
-                    NOT: { id },
-                },
+            const existingTestimony = await prisma.testimonial.findFirst({
+                where:{ id },
             });
 
-            if (existingBlog) {
-                res.status(400).json({ message: "Blog with this title already exists" });
+            if (existingTestimony) {
+                res.status(400).json({ message: "Testimony with this title already exists" });
             }
 
             const updateData: any = {};
@@ -136,43 +132,41 @@ class BlogController {
             if (title !== undefined) updateData.title = title;
             if (content !== undefined) updateData.content = content;
             if (image !== undefined) updateData.image = image;
-            const updatedBlog = await prisma.blog.update({
+            const updatedTestimony = await prisma.blog.update({
                 where: { id },
                 data: updateData,
             });
-            res.status(200).json(updatedBlog);
-            console.log("Blog updated successfully:", updatedBlog);
+            res.status(200).json(updatedTestimony);
         } catch (error) {
-            console.error("Error updating blog:", error);
+            console.error("Error updating testimony:", error);
             res.status(500).json({ message: "Server error" });
         }
     }
 
     // 5. Delete a Blog by ID
-    static async deleteBlog(req: Request, res: Response): Promise<void> {
+    static async deleteTestimony(req: Request, res: Response): Promise<void> {
         const { id } = req.params;
 
         try {
             // Check if the blog exists
-            const existingBlog = await prisma.blog.findUnique({
+            const existingTestimony = await prisma.testimonial.findUnique({
                 where: { id },
             });
 
-            if (!existingBlog) {
-                res.status(404).json({ message: "Blog not found" });
+            if (!existingTestimony) {
+                res.status(404).json({ message: "Testimony not found" });
                 return;
             }
-            const deletedBlog = await prisma.blog.delete({
+            const deletedBlog = await prisma.testimonial.delete({
                 where: { id },
             });
 
-            res.status(200).json({ message: "Blog deleted successfully", deletedBlog });
-            console.log("Blog deleted successfully:", deletedBlog);
+            res.status(200).json({ message: "Testimonial deleted successfully", deletedBlog });
         } catch (error) {
-            console.error("Error deleting blog:", error);
+            console.error("Error deleting testimonial:", error);
             res.status(500).json({ message: "Server error" });
         }
     }
 }
 
-export default BlogController;
+export default TestimonyController;
